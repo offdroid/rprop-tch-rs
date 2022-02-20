@@ -1,0 +1,8 @@
+[package]
+name = "rprop-tch"
+version = "0.1.0"
+edition = "2021"
+license-file = "LICENSE"
+
+[dependencies]
+tch = "0.6.1"
