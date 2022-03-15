@@ -5,4 +5,4 @@ edition = "2021"
 license-file = "LICENSE"
 
 [dependencies]
-tch = "0.6.1"
+tch = "0.7.0"
