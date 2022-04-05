@@ -1,4 +1,5 @@
-[package] name = "rprop-tch"
+[package]
+name = "rprop-tch"
 version = "0.7.0"
 edition = "2021"
 license-file = "LICENSE"

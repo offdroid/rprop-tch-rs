@@ -8,7 +8,6 @@ use tch::Device;
 use tch::Kind;
 use tch::Tensor;
 
-/// Buffer of first/second order moment for the Adam optimizer
 struct Buffer {
     prev: Tensor,
     step_size: Tensor,
@@ -111,10 +110,59 @@ impl Rprop {
         }
     }
 
+    /// Clips gradient value at some specified maximum value.
+    pub fn clip_grad_value(&self, max: f64) {
+        let v = self.vars.lock().unwrap();
+        for var in v.trainable_variables.iter() {
+            let _t = var.tensor.grad().clamp_(-max, max);
+        }
+    }
+
+    /// Clips gradient L2 norm over all trainable parameters.
+    ///
+    /// The norm is computed over all gradients together, as if they were
+    /// concatenated into a single vector.
+    pub fn clip_grad_norm(&self, max: f64) {
+        crate::no_grad(|| {
+            let v = self.vars.lock().unwrap();
+            let mut norms = vec![];
+            for var in v.trainable_variables.iter() {
+                norms.push(var.tensor.grad().norm());
+            }
+            let total_norm = f64::from(Tensor::stack(&norms, 0).norm());
+            let clip_coef = max / (total_norm + 1e-6);
+            if clip_coef < 1.0 {
+                for var in v.trainable_variables.iter() {
+                    let _t = var.tensor.grad().g_mul_scalar_(clip_coef);
+                }
+            }
+        })
+    }
+
     /// Applies a backward step pass, update the gradients, and performs an optimization step.
     pub fn backward_step(&mut self, loss: &Tensor) {
         self.zero_grad();
         loss.backward();
+        self.step();
+    }
+
+    /// Applies a backward step pass, update the gradients, and performs an optimization step.
+    ///
+    /// The gradients are clipped based on `max` before being applied.
+    pub fn backward_step_clip(&mut self, loss: &Tensor, max: f64) {
+        self.zero_grad();
+        loss.backward();
+        self.clip_grad_value(max);
+        self.step();
+    }
+
+    /// Applies a backward step pass, update the gradients, and performs an optimization step.
+    ///
+    /// The gradients L2 norm is clipped based on `max`.
+    pub fn backward_step_clip_norm(&mut self, loss: &Tensor, max: f64) {
+        self.zero_grad();
+        loss.backward();
+        self.clip_grad_norm(max);
         self.step();
     }
 }
